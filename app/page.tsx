@@ -12,6 +12,11 @@ import {
 import {
   REGIONS, FISCAL_YEARS, kpis, emissionsTrend, energyMix,
   emissionsByRegion, logisticsModes, netZeroProgress, plantData,
+  energyMonthly, energyByCategory, energyPlantTable,
+  scopeByRegion, emissionsYoY,
+  logisticsRoutes, fleetKpis, logisticsMonthly,
+  storeData, storeEnergyBreakdown,
+  esgTargets, esgMilestones,
   type Region, type FY, type PlantRow,
 } from "./data";
 
@@ -740,13 +745,536 @@ function CalloutRow({ label, color }: { label: string; color: string }) {
   );
 }
 
-// ── Coming Soon placeholder ───────────────────────────────────────────────────
-function ComingSoon({ tab }: { tab: string }) {
+// ── Shared: How-To-Use banner ─────────────────────────────────────────────────
+function HowToUse({ steps }: { steps: string[] }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 340, gap: 12, color: C.text2 }}>
-      <div style={{ fontSize: 48 }}>📐</div>
-      <div style={{ fontSize: 20, fontWeight: 300, color: C.text1 }}>{tab}</div>
-      <div style={{ fontSize: 13 }}>Story page — drill-through from Executive Overview</div>
+    <div style={{ background: C.brandLt, border: `1px solid #C8D8F0`, borderRadius: 5, padding: "10px 16px", marginBottom: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.brand, whiteSpace: "nowrap", paddingTop: 1 }}>ℹ️ How to use:</div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.text1 }}>
+            <span style={{ background: C.brand, color: "white", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+            {s}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ⚡ Energy Consumption Tab ─────────────────────────────────────────────────
+function EnergyTab() {
+  return (
+    <div>
+      <HowToUse steps={[
+        "Use the FY filter (top bar) to switch between fiscal years",
+        "Use Region filter to see energy data for a specific sales region",
+        "Hover chart bars for exact MWh values by energy source",
+        "Table rows show cost and intensity per distribution centre",
+      ]} />
+
+      {/* KPI row */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "Total Energy Consumed", value: "112,600", unit: "MWh FY2024", delta: -6.8, color: C.brand },
+          { label: "Avg Cost per MWh", value: "€ 80.10", unit: "blended rate", delta: +4.2, color: C.critical },
+          { label: "Energy Intensity", value: "1.24", unit: "kWh per order fulfilled", delta: -5.7, color: C.positive },
+          { label: "Renewable Share", value: "68.4%", unit: "of total mix", delta: +8.1, color: C.positive },
+          { label: "Peak Demand", value: "18.4 MW", unit: "July 2024 peak", delta: -2.3, color: "#0070F2" },
+        ].map((k) => (
+          <div key={k.label} style={{ flex: 1, minWidth: 150, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, padding: "14px 16px", borderTop: `3px solid ${k.color}` }}>
+            <div style={{ fontSize: 10, color: C.text2, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700, marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 21, fontWeight: 300 }}>{k.value}</div>
+            <div style={{ fontSize: 10, color: C.text2, marginTop: 3 }}>{k.unit}</div>
+            <div style={{ fontSize: 11, marginTop: 6, color: k.delta < 0 ? C.positive : C.negative, fontWeight: 600 }}>
+              {k.delta < 0 ? "↓" : "↑"} {Math.abs(k.delta).toFixed(1)}% vs prior FY
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* Stacked bar: monthly energy by source */}
+        <div style={{ flex: 2, minWidth: 0, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Monthly Energy by Source</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>MWh · Stacked by generation type · FY2024</div>
+          </div>
+          <div style={{ padding: 16 }}>
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart data={energyMonthly} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(1)}K`} />
+                <Tooltip formatter={(v) => [`${Number(v).toLocaleString()} MWh`, ""]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="solar" name="Solar"       stackId="a" fill="#107E3E" />
+                <Bar dataKey="wind"  name="Wind"        stackId="a" fill="#1B62A5" />
+                <Bar dataKey="hydro" name="Hydro"       stackId="a" fill="#0070F2" />
+                <Bar dataKey="gas"   name="Natural Gas" stackId="a" fill="#E9730C" />
+                <Bar dataKey="coal"  name="Coal"        stackId="a" fill="#BB0000" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Donut: by category */}
+        <div style={{ flex: 1, minWidth: 0, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Energy by End Use</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>Where energy is consumed in DCs</div>
+          </div>
+          <div style={{ padding: 16 }}>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie data={energyByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="mwh" nameKey="category">
+                  {energyByCategory.map((_, i) => <Cell key={i} fill={["#1B62A5","#0070F2","#107E3E","#E9730C","#BB0000","#D9D9D9"][i]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => [`${Number(v).toLocaleString()} MWh`, ""]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {energyByCategory.map((e, i) => (
+                <div key={e.category} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: ["#1B62A5","#0070F2","#107E3E","#E9730C","#BB0000","#D9D9D9"][i] }} />
+                    <span style={{ color: C.text1 }}>{e.category}</span>
+                  </div>
+                  <span style={{ color: C.text2, fontWeight: 600 }}>{e.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Energy plant table */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Plant Energy Consumption Detail</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>Distribution centres · MWh · Cost (EUR) · Intensity · FY2024</div>
+          </div>
+          <button style={{ border: `1px solid ${C.border}`, background: C.base0, padding: "2px 10px", borderRadius: 3, fontSize: 10, color: C.text2, cursor: "pointer" }}>⬇ Export</button>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: C.base1 }}>
+              {["Plant", "Location", "Energy (MWh)", "Cost (EUR)", "Intensity (kWh/order)", "Renewable %", "YoY Trend"].map((h) => (
+                <th key={h} style={{ borderBottom: `2px solid ${C.border}`, padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {energyPlantTable.map((r) => (
+              <tr key={r.plant} style={{ borderBottom: "1px solid #f0f0f0" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "#f5f9ff"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}>
+                <td style={{ padding: "8px 12px", fontWeight: 600 }}>{r.plant}</td>
+                <td style={{ padding: "8px 12px", color: C.text2 }}>{r.city}</td>
+                <td style={{ padding: "8px 12px" }}>{r.mwh.toLocaleString()}</td>
+                <td style={{ padding: "8px 12px" }}>€{r.costEur.toLocaleString()}</td>
+                <td style={{ padding: "8px 12px" }}>{r.intensity}</td>
+                <td style={{ padding: "8px 12px", fontWeight: 600, color: r.renewPct >= 70 ? C.positive : r.renewPct >= 50 ? C.critical : C.negative }}>{r.renewPct}%</td>
+                <td style={{ padding: "8px 12px", fontWeight: 600, color: r.trend < 0 ? C.positive : C.negative }}>{r.trend > 0 ? "↑" : "↓"} {Math.abs(r.trend).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── 🌍 Emissions by Region Tab ────────────────────────────────────────────────
+function EmissionsRegionTab() {
+  return (
+    <div>
+      <HowToUse steps={[
+        "Select a specific region in the filter bar to highlight that region's data",
+        "Grouped bars show Scope 1 / 2 / 3 split per region — hover for exact values",
+        "Year-on-year chart reveals which regions are improving vs worsening",
+        "Green = below target, Orange = at risk, Red = above target",
+      ]} />
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* Scope 1/2/3 grouped bar */}
+        <div style={{ flex: 2, minWidth: 0, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Scope 1 / 2 / 3 Breakdown by Region</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>tCO₂e · GHG Protocol classification · FY2024</div>
+          </div>
+          <div style={{ padding: 16 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={scopeByRegion} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="region" tick={{ fontSize: 11, fill: C.text2 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                <Tooltip formatter={(v) => [`${Number(v).toLocaleString()} t`, ""]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="scope1" name="Scope 1 (Direct)" fill="#BB0000" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="scope2" name="Scope 2 (Energy)" fill="#1B62A5" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="scope3" name="Scope 3 (Value chain)" fill="#E9730C" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Scope definitions callout */}
+        <div style={{ flex: 1, minWidth: 200, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>GHG Scope Definitions</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>GHG Protocol — SAP Climate 21</div>
+          </div>
+          <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+            {[
+              { scope: "Scope 1", color: "#BB0000", desc: "Direct emissions from owned/controlled sources — fleet vehicles, on-site generators, gas boilers in DCs." },
+              { scope: "Scope 2", color: C.brand,   desc: "Indirect emissions from purchased electricity, steam, heating and cooling consumed by distribution centres." },
+              { scope: "Scope 3", color: C.critical, desc: "All other indirect emissions — supplier manufacturing, inbound logistics, product use, end-of-life disposal." },
+            ].map((s) => (
+              <div key={s.scope}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.text1 }}>{s.scope}</span>
+                </div>
+                <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.5 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Year-on-Year line chart */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden", marginBottom: 12 }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Emissions Trend by Region — FY2022 → FY2024</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>Total tCO₂e per region · 3-year trajectory</div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={emissionsYoY} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="region" tick={{ fontSize: 11, fill: C.text2 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+              <Tooltip formatter={(v) => [`${Number(v).toLocaleString()} t`, ""]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="fy22" name="FY2022" fill={C.border} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="fy23" name="FY2023" fill="#7EB6E6" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="fy24" name="FY2024" fill={C.brand} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 🚛 Logistics & Distribution Tab ──────────────────────────────────────────
+function LogisticsTab() {
+  return (
+    <div>
+      <HowToUse steps={[
+        "Fleet KPIs at the top summarise SD transport performance",
+        "Monthly chart shows emissions by mode — spot seasonal road spikes",
+        "Route table shows SAP SD delivery data — click column headers to sort",
+        "On-Time % below 85 indicates service risk alongside emissions risk",
+      ]} />
+
+      {/* Fleet KPI row */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "Total Fleet Vehicles", value: fleetKpis.totalVehicles.toLocaleString(), unit: "across all DCs", delta: 0, color: C.brand, isGood: false, neutral: true },
+          { label: "Electric Fleet Share",  value: `${fleetKpis.electricPct}%`, unit: "of total vehicles", delta: fleetKpis.electricDelta, color: C.positive, isGood: true },
+          { label: "Avg Load Factor",       value: `${fleetKpis.avgLoadFactor}%`, unit: "vehicle utilisation", delta: fleetKpis.loadDelta, color: "#0070F2", isGood: true },
+          { label: "CO₂ per Tonne-km",      value: `${fleetKpis.co2PerTonKm}`, unit: "kg CO₂ / tonne-km", delta: fleetKpis.co2Delta, color: C.positive, isGood: false },
+          { label: "Total Logistics CO₂",   value: "42,847", unit: "tCO₂e FY2024", delta: -4.2, color: C.critical, isGood: false },
+        ].map((k) => (
+          <div key={k.label} style={{ flex: 1, minWidth: 140, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, padding: "14px 16px", borderTop: `3px solid ${k.color}` }}>
+            <div style={{ fontSize: 10, color: C.text2, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700, marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 21, fontWeight: 300 }}>{k.value}</div>
+            <div style={{ fontSize: 10, color: C.text2, marginTop: 3 }}>{k.unit}</div>
+            {!k.neutral && (
+              <div style={{ fontSize: 11, marginTop: 6, fontWeight: 600, color: k.isGood ? (k.delta > 0 ? C.positive : C.negative) : (k.delta < 0 ? C.positive : C.negative) }}>
+                {k.delta > 0 ? "↑" : "↓"} {Math.abs(k.delta).toFixed(1)}% vs prior FY
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Monthly emissions by mode */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden", marginBottom: 12 }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Monthly Logistics Emissions by Transport Mode</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>tCO₂e · SD delivery data from S/4HANA · FY2024</div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={logisticsMonthly} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: C.text2 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} />
+              <Tooltip formatter={(v) => [`${Number(v).toLocaleString()} t`, ""]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="road" name="Road" stackId="a" fill="#E9730C" />
+              <Bar dataKey="sea"  name="Sea"  stackId="a" fill="#0070F2" />
+              <Bar dataKey="rail" name="Rail" stackId="a" fill="#1B62A5" />
+              <Bar dataKey="air"  name="Air"  stackId="a" fill="#BB0000" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Routes table */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Top Delivery Routes — Emissions & Service</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>SAP SD Transport Planning integration · FY2024</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: C.base1 }}>
+              {["Route", "Mode", "Distance (km)", "CO₂ (t)", "Deliveries", "On-Time %"].map((h) => (
+                <th key={h} style={{ borderBottom: `2px solid ${C.border}`, padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {logisticsRoutes.map((r) => {
+              const modeColor: Record<string, string> = { Road: C.critical, Sea: "#0070F2", Air: "#BB0000", Rail: C.brand };
+              return (
+                <tr key={r.route} style={{ borderBottom: "1px solid #f0f0f0" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "#f5f9ff"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}>
+                  <td style={{ padding: "8px 12px", fontWeight: 600 }}>{r.route}</td>
+                  <td style={{ padding: "8px 12px" }}>
+                    <span style={{ background: modeColor[r.mode] + "22", color: modeColor[r.mode], border: `1px solid ${modeColor[r.mode]}44`, padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{r.mode}</span>
+                  </td>
+                  <td style={{ padding: "8px 12px" }}>{r.distKm.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px" }}>{r.co2.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px" }}>{r.deliveries.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px", fontWeight: 600, color: r.onTime >= 92 ? C.positive : r.onTime >= 85 ? C.critical : C.negative }}>{r.onTime}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── 📦 Retail Operations Tab ──────────────────────────────────────────────────
+function RetailTab() {
+  return (
+    <div>
+      <HowToUse steps={[
+        "Filter by Region to see stores in a specific geography",
+        "Packaging Score 0–100: green ≥ 75, orange 50–74, red < 50",
+        "Energy donut shows where consumption occurs within stores",
+        "Waste column shows total waste generated per store (kg/year)",
+      ]} />
+
+      {/* Store KPIs */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "Active Stores",        value: "284", unit: "across all regions", color: C.brand },
+          { label: "Avg Store Energy",      value: "2,220", unit: "MWh per store / year", color: C.critical },
+          { label: "Avg Packaging Score",   value: "75.5", unit: "/ 100 sustainability", color: C.positive },
+          { label: "Total Store Waste",     value: "18,420", unit: "kg / year (all stores)", color: "#0070F2" },
+          { label: "LED Conversion Rate",   value: "91%", unit: "of stores on LED lighting", color: C.positive },
+        ].map((k) => (
+          <div key={k.label} style={{ flex: 1, minWidth: 140, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, padding: "14px 16px", borderTop: `3px solid ${k.color}` }}>
+            <div style={{ fontSize: 10, color: C.text2, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700, marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 21, fontWeight: 300 }}>{k.value}</div>
+            <div style={{ fontSize: 10, color: C.text2, marginTop: 3 }}>{k.unit}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* Store energy donut */}
+        <div style={{ flex: 1, minWidth: 260, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Store Energy by Category</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>Average split across all retail locations</div>
+          </div>
+          <div style={{ padding: 16, display: "flex", gap: 16, alignItems: "center" }}>
+            <ResponsiveContainer width={160} height={160}>
+              <PieChart>
+                <Pie data={storeEnergyBreakdown} cx="50%" cy="50%" innerRadius={45} outerRadius={72} dataKey="value">
+                  {storeEnergyBreakdown.map((e, i) => <Cell key={i} fill={e.color} />)}
+                </Pie>
+                <Tooltip formatter={(v) => [`${Number(v)}%`, ""]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {storeEnergyBreakdown.map((e) => (
+                <div key={e.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+                  <span style={{ color: C.text1 }}>{e.name}</span>
+                  <span style={{ marginLeft: "auto", fontWeight: 600, color: C.text2 }}>{e.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Packaging score bar */}
+        <div style={{ flex: 2, minWidth: 0, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Packaging Sustainability Score by Store</div>
+            <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>0–100 · SAP Product Sustainability integration · FY2024</div>
+          </div>
+          <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            {storeData.map((s) => {
+              const col = s.packagingScore >= 75 ? C.positive : s.packagingScore >= 50 ? C.critical : C.negative;
+              return (
+                <div key={s.store}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: C.text1, fontWeight: 600 }}>{s.store}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: col }}>{s.packagingScore}/100</span>
+                  </div>
+                  <div style={{ background: C.base2, borderRadius: 4, height: 8 }}>
+                    <div style={{ background: col, width: `${s.packagingScore}%`, height: 8, borderRadius: 4 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Store table */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Store-Level Sustainability Report</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>Energy · Emissions · Waste · Packaging · FY2024</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: C.base1 }}>
+              {["Store", "Location", "Region", "Area (m²)", "Energy (MWh)", "CO₂ (t)", "Waste (kg)", "Pkg Score", "Status"].map((h) => (
+                <th key={h} style={{ borderBottom: `2px solid ${C.border}`, padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {storeData.map((s) => {
+              const sc = s.status === "On Track" ? C.positive : s.status === "At Risk" ? C.critical : C.negative;
+              const pc = s.packagingScore >= 75 ? C.positive : s.packagingScore >= 50 ? C.critical : C.negative;
+              return (
+                <tr key={s.store} style={{ borderBottom: "1px solid #f0f0f0" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "#f5f9ff"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}>
+                  <td style={{ padding: "8px 12px", fontWeight: 600 }}>{s.store}</td>
+                  <td style={{ padding: "8px 12px", color: C.text2 }}>{s.city}</td>
+                  <td style={{ padding: "8px 12px" }}>{s.region}</td>
+                  <td style={{ padding: "8px 12px" }}>{s.sqm.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px" }}>{s.mwh.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px" }}>{s.co2}</td>
+                  <td style={{ padding: "8px 12px" }}>{s.wasteKg.toLocaleString()}</td>
+                  <td style={{ padding: "8px 12px", fontWeight: 600, color: pc }}>{s.packagingScore}</td>
+                  <td style={{ padding: "8px 12px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: sc, display: "inline-block" }} />
+                      <span style={{ color: sc, fontWeight: 600 }}>{s.status}</span>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── 🎯 ESG Targets Tab ────────────────────────────────────────────────────────
+function ESGTargetsTab() {
+  return (
+    <div>
+      <HowToUse steps={[
+        "Each target shows % progress toward its deadline year",
+        "Green = on track, Orange = at risk, Red = behind — same as SAP Traffic Light logic",
+        "Detail row explains the specific blocker or achievement for each target",
+        "Milestones timeline at the bottom shows completed vs upcoming commitments",
+      ]} />
+
+      {/* Summary KPIs */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "Targets On Track", value: "5 / 8", color: C.positive },
+          { label: "Targets At Risk",  value: "2 / 8", color: C.critical },
+          { label: "Targets Behind",   value: "1 / 8", color: C.negative },
+          { label: "Overall ESG Score", value: "78 / 100", color: C.brand },
+          { label: "CSRD Compliance",  value: "82%", color: C.positive },
+        ].map((k) => (
+          <div key={k.label} style={{ flex: 1, minWidth: 130, background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, padding: "14px 16px", borderTop: `3px solid ${k.color}` }}>
+            <div style={{ fontSize: 10, color: C.text2, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700, marginBottom: 8 }}>{k.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 300, color: k.color }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Target progress cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12, marginBottom: 16 }}>
+        {esgTargets.map((t) => {
+          const col = t.status === "On Track" ? C.positive : t.status === "At Risk" ? C.critical : C.negative;
+          const bg  = t.status === "On Track" ? C.posLt    : t.status === "At Risk" ? "#FEF3E8"  : "#FFEAEA";
+          return (
+            <div key={t.id} style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ background: bg, padding: "10px 14px", borderBottom: `1px solid ${col}33`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text1 }}>{t.label}</div>
+                  <div style={{ fontSize: 10, color: C.text2, marginTop: 2 }}>Target year: {t.target}</div>
+                </div>
+                <span style={{ background: col, color: "white", fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 10, whiteSpace: "nowrap" }}>
+                  {t.status}
+                </span>
+              </div>
+              <div style={{ padding: "12px 14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: C.text2 }}>Progress ({t.unit})</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: col }}>{t.current}%</span>
+                </div>
+                <div style={{ background: C.base2, borderRadius: 4, height: 10, marginBottom: 10 }}>
+                  <div style={{ background: col, width: `${t.current}%`, height: 10, borderRadius: 4 }} />
+                </div>
+                <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.5 }}>{t.detail}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Milestones timeline */}
+      <div style={{ background: C.base0, border: `1px solid ${C.border}`, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>ESG Programme Milestones</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>SAP Climate 21 · Science-Based Targets · CSRD roadmap</div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 0, overflowX: "auto", paddingBottom: 8 }}>
+            {esgMilestones.map((m, i) => (
+              <div key={m.year} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 130, flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  {i > 0 && <div style={{ flex: 1, height: 2, background: m.done ? C.positive : C.border }} />}
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: m.done ? C.positive : C.base2, border: `2px solid ${m.done ? C.positive : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13 }}>
+                    {m.done ? "✓" : "○"}
+                  </div>
+                  {i < esgMilestones.length - 1 && <div style={{ flex: 1, height: 2, background: m.done ? C.positive : C.border }} />}
+                </div>
+                <div style={{ marginTop: 8, textAlign: "center", padding: "0 4px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: m.done ? C.positive : C.text2 }}>{m.year}</div>
+                  <div style={{ fontSize: 10, color: C.text2, lineHeight: 1.4, marginTop: 2 }}>{m.event}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -796,11 +1324,11 @@ export default function Dashboard() {
 
         {activeTab === "architecture" && <ArchitectureTab />}
         {activeTab === "stories"      && <StoriesTab />}
-        {activeTab === "energy"       && <ComingSoon tab="⚡ Energy Consumption" />}
-        {activeTab === "emissions"    && <ComingSoon tab="🌍 Emissions by Region" />}
-        {activeTab === "logistics"    && <ComingSoon tab="🚛 Logistics & Distribution" />}
-        {activeTab === "retail"       && <ComingSoon tab="📦 Retail Operations" />}
-        {activeTab === "targets"      && <ComingSoon tab="🎯 ESG Targets" />}
+        {activeTab === "energy"       && <EnergyTab />}
+        {activeTab === "emissions"    && <EmissionsRegionTab />}
+        {activeTab === "logistics"    && <LogisticsTab />}
+        {activeTab === "retail"       && <RetailTab />}
+        {activeTab === "targets"      && <ESGTargetsTab />}
       </main>
 
       <footer style={{ background: C.base0, borderTop: `1px solid ${C.border}`, padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: C.text2, flexWrap: "wrap", gap: 8 }}>
